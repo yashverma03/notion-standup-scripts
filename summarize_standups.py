@@ -9,7 +9,6 @@ import os
 import sys
 from typing import Dict, List, Any
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
-import torch
 
 def get_initial_prompt() -> str:
     """
@@ -99,7 +98,7 @@ def setup_local_model():
 
     except Exception as e:
         print(f"Error loading model: {e}")
-        print("AI model is required for summarization. Please install transformers and torch.")
+        print("AI model is required for summarization. Please install transformers.")
         sys.exit(1)
 
 def summarize_with_ai(generator, project_name: str, contents: List[str]) -> str:
