@@ -498,8 +498,8 @@ class NotionStandup:
             Path to the saved JSON file
         """
         # Hardcoded output directory and filename
-        output_dir = "logs/work-done-today"
-        filename = "work-done-today.json"
+        output_dir = "logs"
+        filename = "standups.json"
         filepath = os.path.join(output_dir, filename)
 
         # Create output directory if it doesn't exist
