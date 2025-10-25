@@ -9,6 +9,11 @@ import os
 import sys
 from typing import Dict, List, Any
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+from dotenv import load_dotenv
+from utils import get_env_or_throw
+
+# Load environment variables
+load_dotenv()
 
 def get_initial_prompt() -> str:
     """
@@ -70,8 +75,9 @@ def setup_local_model():
         Text generation pipeline
     """
     try:
-        # Use a smaller, efficient model for local processing
-        model_name = "microsoft/DialoGPT-medium"
+        # Get model name from environment variable
+        model_name = get_env_or_throw("AI_MODEL_NAME")
+        print(f"Using AI model: {model_name}")
 
         print("Loading local AI model...")
         tokenizer = AutoTokenizer.from_pretrained(model_name)
