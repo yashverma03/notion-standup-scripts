@@ -478,8 +478,9 @@ class NotionStandup:
         Returns:
             Path to the saved JSON file
         """
-        # Hardcoded output directory and filename
-        output_dir = "logs"
+        # Get project root directory (parent of src/)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        output_dir = os.path.join(project_root, "logs")
         filename = "standups.json"
         filepath = os.path.join(output_dir, filename)
 

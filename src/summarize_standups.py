@@ -210,8 +210,10 @@ def save_summaries(summaries: List[Dict[str, Any]], output_path: str) -> None:
 
 def main():
     """Main function to run the standup summarization."""
-    input_file = "logs/standups.json"
-    output_file = "logs/standups-summarized.json"
+    # Get project root directory (parent of src/)
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_file = os.path.join(project_root, "logs", "standups.json")
+    output_file = os.path.join(project_root, "logs", "standups-summarized.json")
 
     print("Starting Standup Summarization...")
 
