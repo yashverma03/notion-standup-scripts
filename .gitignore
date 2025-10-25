@@ -1,0 +1,24 @@
+# Logs
+logs
+*.log
+build
+dist
+*.local
+*.tmp*
+tmp
+output
+venv
+.venv
+__pycache__
+
+# Editor directories and files
+.vscode/*
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.env*
+!.env.example
