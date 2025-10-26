@@ -12,41 +12,10 @@ from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 import torch
 from dotenv import load_dotenv
 from utils import get_env_or_throw
+from standup_prompt import StandupPromptGenerator
 
 # Load environment variables
 load_dotenv()
-
-def get_initial_prompt() -> str:
-    """
-    Get the initial prompt for standup summarization.
-
-    Returns:
-        Initial prompt string
-    """
-    return """You are a professional standup summarization assistant. Your task is to create comprehensive, detailed summaries of daily work accomplishments.
-
-Instructions:
-1. Expand on all work items, even if they seem simple, easy, boring, or less valuable
-2. Include ALL logged work - do not skip anything
-3. Transform short phrases and keywords into detailed, professional sentences
-4. Add context and technical details to make work sound substantial
-5. Keep any ticket numbers (like TEN-xxx, JIRA-xxx, etc.)
-6. Make the summary sound impressive and professional
-7. Use action-oriented language with technical terminology
-8. Expand simple tasks into detailed accomplishments
-9. Add business value and impact where appropriate
-10. Do NOT add credentials, API keys, passwords, or sensitive environment values
-11. Focus on technical achievements and deliverables
-
-Format the output as a single string with bullet points separated by newlines.
-Each bullet point should start with a dash (-) and be detailed and comprehensive.
-
-Example transformations:
-Input: "fixed bug" → Output: "- Resolved critical application bug affecting user authentication flow, implementing proper error handling and validation"
-Input: "updated docs" → Output: "- Updated comprehensive technical documentation including API specifications, deployment procedures, and troubleshooting guides"
-Input: "tested feature" → Output: "- Conducted thorough testing of new feature implementation including unit tests, integration tests, and user acceptance testing"
-
-Now summarize the following standup data:"""
 
 def load_standups(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -108,8 +77,9 @@ def summarize_with_ai(generator, project_name: str, contents: list) -> str:
     work_items = "\n".join([f"- {item}" for item in contents])
     input_text = f"Project: {project_name}\nWork completed:\n{work_items}"
 
-    # Get the initial prompt
-    initial_prompt = get_initial_prompt()
+    # Get the initial prompt using StandupPromptGenerator
+    prompt_generator = StandupPromptGenerator()
+    initial_prompt = prompt_generator.get_initial_prompt()
 
     # Combine initial prompt with the actual data
     prompt = f"{initial_prompt}\n\n{input_text}"
