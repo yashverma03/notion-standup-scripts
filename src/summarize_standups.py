@@ -9,6 +9,7 @@ import os
 import sys
 from typing import Dict, List, Any
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+import torch
 from dotenv import load_dotenv
 from utils import get_env_or_throw
 
@@ -22,19 +23,30 @@ def get_initial_prompt() -> str:
     Returns:
         Initial prompt string
     """
-    return """Transform these work items into professional bullet points. Expand each item into a detailed accomplishment:
+    return """You are a professional standup summarization assistant. Your task is to create comprehensive, detailed summaries of daily work accomplishments.
 
-Example:
-Input: "fixed bug in rent flow"
-Output: "- Resolved critical bug in rental payment processing system, ensuring smooth transaction flow and improved user experience"
+Instructions:
+1. Expand on all work items, even if they seem simple, easy, boring, or less valuable
+2. Include ALL logged work - do not skip anything
+3. Transform short phrases and keywords into detailed, professional sentences
+4. Add context and technical details to make work sound substantial
+5. Keep any ticket numbers (like TEN-xxx, JIRA-xxx, etc.)
+6. Make the summary sound impressive and professional
+7. Use action-oriented language with technical terminology
+8. Expand simple tasks into detailed accomplishments
+9. Add business value and impact where appropriate
+10. Do NOT add credentials, API keys, passwords, or sensitive environment values
+11. Focus on technical achievements and deliverables
 
-Input: "small ui glitch gone"
-Output: "- Fixed minor UI rendering issue that was causing visual inconsistencies, enhancing overall user interface quality"
+Format the output as a single string with bullet points separated by newlines.
+Each bullet point should start with a dash (-) and be detailed and comprehensive.
 
-Input: "retry job half done"
-Output: "- Implemented robust retry mechanism for failed background jobs, improving system reliability and error handling"
+Example transformations:
+Input: "fixed bug" → Output: "- Resolved critical application bug affecting user authentication flow, implementing proper error handling and validation"
+Input: "updated docs" → Output: "- Updated comprehensive technical documentation including API specifications, deployment procedures, and troubleshooting guides"
+Input: "tested feature" → Output: "- Conducted thorough testing of new feature implementation including unit tests, integration tests, and user acceptance testing"
 
-Now transform these work items:"""
+Now summarize the following standup data:"""
 
 def load_standups(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -59,112 +71,79 @@ def load_standups(file_path: str) -> List[Dict[str, Any]]:
 def setup_local_model():
     """
     Setup local AI model for text generation.
-
     Returns:
-        Text generation pipeline
+        Hugging Face text-generation pipeline
     """
-    try:
-        # Get model name from environment variable
-        model_name = get_env_or_throw("AI_MODEL_NAME")
-        print(f"Using AI model: {model_name}")
+    model_name = get_env_or_throw("AI_MODEL_NAME")
 
-        print("Loading local AI model...")
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name)
+    # Load tokenizer and model
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        device_map="auto",        # Automatically place layers on GPU/CPU
+        torch_dtype=torch.float16, # Use half precision to save memory
+        trust_remote_code=True
+    )
 
-        # Add padding token if it doesn't exist
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
+    # Force CPU to avoid GPU memory issues
+    generator = pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        max_length=512,
+        do_sample=True,
+        temperature=0.9,
+        top_p=0.95,
+        top_k=50,
+        repetition_penalty=1.5,
+        no_repeat_ngram_size=3
+    )
 
-        # Create text generation pipeline
-        generator = pipeline(
-            "text-generation",
-            model=model,
-            tokenizer=tokenizer,
-            max_length=512,  # Reasonable limit for summaries
-            do_sample=True,
-            temperature=0.9,  # Higher creativity for better expansion
-            top_p=0.95,  # More diverse sampling
-            top_k=50,  # Limit vocabulary for better quality
-            repetition_penalty=1.2,  # Avoid repetition
-            pad_token_id=tokenizer.eos_token_id
-        )
+    return generator
 
-        print("Model loaded successfully!")
-        return generator
-
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        print("AI model is required for summarization. Please install transformers.")
-        sys.exit(1)
-
-def summarize_with_ai(generator, project_name: str, contents: List[str]) -> str:
+def summarize_with_ai(generator, project_name: str, contents: list) -> str:
     """
     Summarize standup contents using AI model.
-
-    Args:
-        generator: AI text generation pipeline
-        project_name: Name of the project
-        contents: List of work items
-
-    Returns:
-        Summarized work description
     """
-    # Prepare input text with all work items
     work_items = "\n".join([f"- {item}" for item in contents])
     input_text = f"Project: {project_name}\nWork completed:\n{work_items}"
 
-    # Create prompt
-    prompt = get_initial_prompt() + "\n\n" + input_text
+    # Get the initial prompt
+    initial_prompt = get_initial_prompt()
+
+    # Combine initial prompt with the actual data
+    prompt = f"{initial_prompt}\n\n{input_text}"
 
     try:
-        # Generate summary with focused parameters
         result = generator(
             prompt,
-            max_new_tokens=200,  # Reasonable limit for summaries
-            num_return_sequences=1,
-            temperature=0.9,  # High creativity for expansion
+            max_new_tokens=300,
             do_sample=True,
+            temperature=0.9,
             top_p=0.95,
             top_k=50,
-            repetition_penalty=1.2,
-            pad_token_id=generator.tokenizer.eos_token_id
+            repetition_penalty=1.5,
+            no_repeat_ngram_size=3
         )
 
-        # Extract generated text
+        # Extract text
         generated_text = result[0]['generated_text']
+        # Remove original prompt from generated text
+        summary = generated_text[len(prompt):].strip()
 
-        # Extract only the summary part (after the prompt)
-        if "Now transform these work items:" in generated_text:
-            summary = generated_text.split("Now transform these work items:")[-1].strip()
-        else:
-            summary = generated_text[len(prompt):].strip()
+        # fallback: if summary too short, just return generated text
+        if len(summary) < 20:
+            summary = generated_text.strip()
 
-        # Clean up the summary
-        summary = summary.replace("Project:", "").replace("Work completed:", "").strip()
-
-        # If summary is too short or just repeats input, try a different approach
-        if len(summary) < 50 or "Project:" in summary:
-            # Try a simpler prompt
-            simple_prompt = f"Rewrite these work items professionally:\n{work_items}\n\nProfessional summary:"
-            simple_result = generator(
-                simple_prompt,
-                max_new_tokens=150,
-                temperature=0.9,
-                do_sample=True,
-                top_p=0.95,
-                top_k=50,
-                repetition_penalty=1.2,
-                pad_token_id=generator.tokenizer.eos_token_id
-            )
-            summary = simple_result[0]['generated_text'].replace(simple_prompt, "").strip()
+        print(f"=== OUTPUT ===")
+        print(summary)
+        print(f"=== END OUTPUT ===\n")
 
         return summary
 
     except Exception as e:
-        print(f"Error in AI generation: {e}")
-        raise e
-
+        print(f"AI generation failed: {e}")
+        return "AI generation failed."
 
 def process_standups(standups: List[Dict[str, Any]], generator) -> List[Dict[str, Any]]:
     """
@@ -180,8 +159,6 @@ def process_standups(standups: List[Dict[str, Any]], generator) -> List[Dict[str
     summarized_standups = []
 
     for i, standup in enumerate(standups):
-        print(f"Processing standup {i+1}/{len(standups)}: {standup.get('title', 'Unknown')}")
-
         project_name = standup.get('projectName', 'Unknown Project')
         contents = standup.get('contents', [])
 
@@ -213,8 +190,6 @@ def save_summaries(summaries: List[Dict[str, Any]], output_path: str) -> None:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(summaries, f, indent=2, ensure_ascii=False)
 
-        print(f"Summaries saved to {output_path}")
-
     except Exception as e:
         print(f"Error saving summaries: {e}")
         sys.exit(1)
@@ -226,26 +201,17 @@ def main():
     input_file = os.path.join(project_root, "logs", "standups.json")
     output_file = os.path.join(project_root, "logs", "standups-summarized.json")
 
-    print("Starting Standup Summarization...")
-
     # Load standup data
-    print(f"Loading standups from {input_file}...")
     standups = load_standups(input_file)
-    print(f"Loaded {len(standups)} standups")
 
     # Setup AI model
     generator = setup_local_model()
 
     # Process standups
-    print("Processing standups...")
     summarized_standups = process_standups(standups, generator)
 
     # Save summaries
-    print("Saving summaries...")
     save_summaries(summarized_standups, output_file)
-
-    print("Standup summarization completed successfully!")
-    print(f"Output saved to: {output_file}")
 
 if __name__ == "__main__":
     main()
