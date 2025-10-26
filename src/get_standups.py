@@ -498,6 +498,34 @@ class NotionStandup:
             print(f"Error saving to JSON: {e}")
             sys.exit(1)
 
+
+    def merge_by_project(self, pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Merge page entries by projectName, combining their contents.
+
+        Args:
+            pages: List of page dictionaries with keys "projectName" and "contents"
+
+        Returns:
+            List of merged page dictionaries, one per unique projectName
+        """
+        merged: Dict[str, Dict[str, Any]] = {}
+
+        for page in pages:
+            project = page.get("projectName", "Unknown Project")
+            if project not in merged:
+                # Initialize new entry
+                merged[project] = {
+                    "projectName": project,
+                    "contents": list(page.get("contents", []))
+                }
+            else:
+                # Append contents if project already exists
+                merged[project]["contents"].extend(page.get("contents", []))
+
+        # Convert merged dict back to a list
+        return list(merged.values())
+
     def run(self) -> str:
         """
         Main method to fetch done pages and save to JSON.
@@ -524,8 +552,11 @@ class NotionStandup:
             extracted_page = self.extract_simple_content(page)
             processed_pages.append(extracted_page)
 
+        # Merge by projectName
+        merged_pages = self.merge_by_project(processed_pages)
+
         # Save to JSON file
-        return self.save_to_json(processed_pages)
+        return self.save_to_json(merged_pages)
 
 
 def main():
