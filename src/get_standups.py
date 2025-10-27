@@ -450,6 +450,10 @@ class NotionStandup:
             select_obj = project_prop.get("select")
             extracted["projectName"] = select_obj.get("name", "") if select_obj else ""
 
+        # Add title to contents array
+        if extracted["title"]:
+            extracted["contents"].append(extracted["title"])
+
         # Fetch and extract only specific content types recursively
         if page_id:
             print(f"  Fetching content for page {page_id}...")
