@@ -420,6 +420,7 @@ class NotionStandup:
     def extract_simple_content(self, page: Dict[str, Any]) -> Dict[str, Any]:
         """
         Extract id, title, projectName, and contents (checkbox, bullet points, normal text only).
+        All contents for a page are combined into a single line separated by periods.
 
         Args:
             page: Raw page object from Notion API
@@ -450,9 +451,12 @@ class NotionStandup:
             select_obj = project_prop.get("select")
             extracted["projectName"] = select_obj.get("name", "") if select_obj else ""
 
-        # Add title to contents array
+        # Collect all content pieces for this page
+        content_pieces = []
+
+        # Add title as first content piece
         if extracted["title"]:
-            extracted["contents"].append(extracted["title"])
+            content_pieces.append(extracted["title"])
 
         # Fetch and extract only specific content types recursively
         if page_id:
@@ -466,9 +470,14 @@ class NotionStandup:
                 if not content:
                     continue
 
-                # Add all content types to single array
+                # Add all content types to content pieces
                 if block_type in ["to_do", "bulleted_list_item", "numbered_list_item", "paragraph", "heading_1", "heading_2", "heading_3"]:
-                    extracted["contents"].append(content)
+                    content_pieces.append(content)
+
+        # Combine all content pieces into a single line separated by periods
+        if content_pieces:
+            combined_content = ". ".join(content_pieces)
+            extracted["contents"].append(combined_content)
 
         return extracted
 
