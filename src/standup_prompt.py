@@ -25,24 +25,14 @@ class StandupPromptGenerator:
         Returns:
             Initial prompt string
         """
-        return """You are a professional standup summarization assistant. Your task is to create comprehensive, detailed summaries of daily work accomplishments.
-
-Instructions:
-- Expand on all work items, even if they seem simple, easy, boring, or less valuable
-- Include ALL logged work - do not skip anything
-- Transform short phrases and keywords into detailed, professional sentences
-- Add some context and technical details to make work sound substantial. Do not add too much details.
-- Keep any ticket numbers (like TEN-xxx, JIRA-xxx, etc.) in the beginning of the bullet point.
-- Do NOT add credentials, API keys, passwords, or sensitive environment values or any URLs.
-- Do not add any other information than the work accomplished.
+        return """
+Complete the following work items into proper sentences.
+Keep ticket numbers at the beginning.
+Do not add extra details.
+Do NOT add credentials, API keys, passwords, or sensitive environment values or any URLs.
 
 Format the output as a single string with bullet points separated by newlines.
-Each bullet point should start with a dash (-) and be detailed and comprehensive.
-
-Example transformations:
-Input: "fixed bug" → Output: "- Resolved critical application bug affecting user authentication flow, implementing proper error handling and validation"
-Input: "updated docs" → Output: "- Updated comprehensive technical documentation including API specifications, deployment procedures, and troubleshooting guides"
-Input: "tested feature" → Output: "- Conducted thorough testing of new feature implementation including unit tests, integration tests, and user acceptance testing"
+Each bullet point should start with a dash (-)
 
 Now summarize the following standup data:"""
 
